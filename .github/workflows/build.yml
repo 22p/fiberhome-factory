@@ -1,0 +1,58 @@
+name: Build FiberHome Factory
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release --locked
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fiberhome-factory-windows-x86_64
+          path: target/release/fiberhome-factory.exe
+          if-no-files-found: error
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release --locked
+      - name: Package
+        run: tar -C target/release -czf fiberhome-factory-macos.tar.gz fiberhome-factory
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fiberhome-factory-macos
+          path: fiberhome-factory-macos.tar.gz
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential libx11-dev libxkbcommon-dev pkg-config
+      - name: Build
+        run: cargo build --release --locked --features linux-x11
+      - name: Package
+        run: |
+          cp target/release/fiberhome-factory fiberhome-factory-x86_64-linux
+          tar -czf fiberhome-factory-x86_64-linux.tar.gz fiberhome-factory-x86_64-linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fiberhome-factory-linux-x86_64
+          path: fiberhome-factory-x86_64-linux.tar.gz
+          if-no-files-found: error
