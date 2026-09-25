@@ -564,6 +564,12 @@ impl Factory {
         let sn = parse_pon_serial(path, required_field(path, &fields, "GponSN")?)?;
         place(&mut image, BASE_MAC_OFFSET, &mac, "MAC")?;
         place(&mut image, PON_SN_OFFSET, &sn, "PON SN")?;
+        if files.contains_key("wlan/AX3000_RT30xxEEPROM_5.bin") {
+            let base: [u8; BASE_MAC_SIZE] = mac.as_slice().try_into().unwrap();
+            let (wifi_2g, wifi_5g) = derive_wifi_macs(&base);
+            place(&mut image, WIFI_OFFSET + 4, &wifi_2g, "2.4 GHz MAC")?;
+            place(&mut image, WIFI_OFFSET + 10, &wifi_5g, "5 GHz MAC")?;
+        }
         if let Some(value) = fields.get("SerialNumber").filter(|s| !s.is_empty()) {
             place(
                 &mut image,
@@ -658,6 +664,18 @@ fn hex_mac(d: &[u8]) -> String {
         .map(|b| format!("{b:02X}"))
         .collect::<Vec<_>>()
         .join(":")
+}
+fn derive_wifi_macs(base: &[u8; BASE_MAC_SIZE]) -> ([u8; BASE_MAC_SIZE], [u8; BASE_MAC_SIZE]) {
+    let mut wifi_2g = *base;
+    wifi_2g[1] = wifi_2g[1].wrapping_add(1);
+    let mut wifi_5g = wifi_2g;
+    let last = wifi_5g[5] as u16 + 8;
+    wifi_5g[5] = if last > u8::MAX as u16 {
+        (last - 255) as u8
+    } else {
+        last as u8
+    };
+    (wifi_2g, wifi_5g)
 }
 fn display_sn(text: &str) -> Result<Vec<u8>> {
     if text.len() == 12
